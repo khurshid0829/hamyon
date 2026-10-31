@@ -68,5 +68,6 @@ window.ICONS = {
   chev: 'M9 6l6 6-6 6',
   check: 'M20 6L9 17l-5-5',
   alert: 'M12 8v5M12 16.5v.5M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18z',
-  refresh: 'M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5'
+  refresh: 'M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5',
+  trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6'
 };

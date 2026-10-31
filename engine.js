@@ -155,6 +155,52 @@
     };
   }
 
+  // ---------- typing and receipts ----------
+
+  // what a money field shows while typing: "1250000,5" -> "1 250 000,5"; keeps a leading minus and up to 2 decimals
+  function fmtTyping(s) {
+    s = String(s == null ? '' : s).replace(/[^\d.,−-]/g, '');
+    var neg = /^[−-]/.test(s);
+    s = s.replace(/[−-]/g, '');
+    var i = s.search(/[.,]/), whole = i < 0 ? s : s.slice(0, i), frac = i < 0 ? null : s.slice(i + 1).replace(/[.,]/g, '').slice(0, 2);
+    whole = whole.replace(/^0+(?=\d)/, '');
+    return (neg ? '-' : '') + group(whole) + (frac == null ? '' : ',' + frac);
+  }
+
+  // "186 500,00", "186,500.00", "186.500" -> whole so'm
+  function receiptNumber(tok) {
+    tok = tok.replace(/[\s ]/g, '');
+    var m = /^(.*?)[.,](\d{2})$/.exec(tok), whole = m ? m[1] : tok;
+    var v = parseInt(whole.replace(/[.,]/g, ''), 10);
+    return isNaN(v) ? null : v + (m && +m[2] >= 50 ? 1 : 0);
+  }
+
+  var TOTAL_WORDS = /(jami|umumiy|итого|всего|жами|total|к оплате|to[ʻ'’`]?lov\s+summa)/i;
+  var NOT_TOTAL = /(qqs|ндс|nds|vat|soliq|qaytim|сдача|chegirma|скидка|naqd|наличн|karta|карт|bank|terminal)/i;
+  var SHOP_SKIP = /(chek|чек|stir|инн|inn|kassa|касс|sana|дата|vaqt|время|manzil|адрес|tel|fiskal|фиск|ofd|qr|xarid|покупк|smena|смена|№)/i;
+
+  // reads the total and shop from receipt text copied with the phone's text recognition
+  function parseReceipt(text, cats) {
+    var lines = String(text || '').replace(/ /g, ' ').split(/\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+    if (lines.length < 2) return null;
+    var total = null;
+    lines.forEach(function (l, i) {
+      if (!TOTAL_WORDS.test(l) || NOT_TOTAL.test(l)) return;
+      var toks = (l.match(/\d[\d\s.,]*\d|\d/g) || []).concat(lines[i + 1] && !/[a-zа-я]{3}/i.test(lines[i + 1]) ? lines[i + 1].match(/\d[\d\s.,]*\d|\d/g) || [] : []);
+      toks.forEach(function (t) { var v = receiptNumber(t.trim()); if (v && (total == null || v > total)) total = v; });
+    });
+    if (!total) return null;
+    var shop = '';
+    lines.some(function (l) {
+      var s = l.replace(/["«»“”]/g, '').replace(/(^|\s)(MChJ|MCHJ|XK|OOO|ООО|МЧЖ|ХК|LLC|AJ|АЖ|YaTT|ЯТТ)\.?(?=\s|$)/gi, ' ').replace(/\s+/g, ' ').trim();
+      if (s.length < 3 || /\d{3}/.test(s) || SHOP_SKIP.test(s) || TOTAL_WORDS.test(s)) return false;
+      shop = s === s.toUpperCase() ? s.toLowerCase().replace(/(^|\s)\S/g, function (c) { return c.toUpperCase(); }) : s;
+      return true;
+    });
+    return { kind: 'out', amount: total, ccy: 'UZS', balance: null, card: null, receipt: true,
+      name: shop || 'Chek', cat: detectCategory(shop, cats) || detectCategory(lines.join(' '), cats) };
+  }
+
   // ---------- balances and statistics ----------
 
   // tx: { date, kind: 'out'|'in'|'move', amount, ccy, acc, toAcc, toAmount, cat, uzs, rate }
@@ -284,6 +330,7 @@
     daysInMonth: daysInMonth, daysBetween: daysBetween,
     fmtNum: fmtNum, fmtMoney: fmtMoney, fmtShort: fmtShort, toUZS: toUZS, toMinor: toMinor,
     findAmount: findAmount, skey: skey, fromCyrillic: fromCyrillic, detectCategory: detectCategory, parseLine: parseLine, parseSms: parseSms,
+    fmtTyping: fmtTyping, parseReceipt: parseReceipt,
     balances: balances, monthStats: monthStats, safeToSpend: safeToSpend, series: series, compareMonths: compareMonths,
     nextDue: nextDue, toNewLatin: toNewLatin, toCyrillic: toCyrillic, translitHtml: translitHtml
   };

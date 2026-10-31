@@ -16,6 +16,7 @@ node --test tests/engine.test.js    # dvigatel testlari
 | Tez kiritish | Summa → turkum → saqlash (3 bosish), “000” tugmasi, soʻm ⇄ $, oxirgi ishlatilgan hisob |
 | Matn | `non 8 ming, sut 14 000, taksi 25k, kitob $15` — bir yoʻla bir nechta yozuv, turkum soʻzdan aniqlanadi (kirillda ham) |
 | SMS | Karta SMS yoki bildirishnomasidan summa, doʻkon, karta (*4417) va qoldiq; qoldiq ilovadagi bilan solishtiriladi |
+| Chek | iPhone kamerasining matn tanish funksiyasi bilan nusxalangan chekdan jami summa (“Jami”, “Итого”) va doʻkon nomi |
 | Tahlil | Turkumlar, oʻtgan oyning shu kunlari bilan solishtirish, dollarda oʻlchash, 6 oy, oddiy tildagi xulosalar |
 | Rejalar | Oylik reja, “kuniga qancha”, turkum limitlari, doimiy toʻlovlar, qarzlar, jamgʻarma maqsadlari |
 | Hisoblar | Naqd, kartalar, dollar; oʻtkazma va valyuta almashtirish; Markaziy bank kursi (cbu.uz) yoki bozor kursi |

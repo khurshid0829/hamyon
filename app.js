@@ -4,7 +4,7 @@
 
   var E = window.Engine;
   var KEY = 'hamyon-v1';
-  var VERSION = '0.1';
+  var VERSION = '0.2';
   var FALLBACK_RATE = 12000;
   var CBU_URL = 'https://cbu.uz/uz/arkhiv-kursov-valyut/json/USD/';
   var TABS = [['asosiy', 'Asosiy', 'wallet'], ['tahlil', 'Tahlil', 'chart'], ['rejalar', 'Rejalar', 'target'], ['hisoblar', 'Hisoblar', 'list']];
@@ -150,10 +150,10 @@
     return header('Xush kelibsiz', 'Hamyon') +
       '<section class="card"><p class="lead">Ilova oila pulini bir telefonda hisoblaydi. Maʼlumotlar faqat shu telefonda saqlanadi.</p>' +
       '<p class="small mu">Hozirgi qoldiqlarni yozing (bilmasangiz, 0 qoldiring, keyin tuzatasiz).</p>' +
-      '<label class="field"><span>Naqd soʻm</span><input class="input num" id="s-cash" inputmode="numeric" placeholder="0"></label>' +
-      '<label class="field"><span>Bank kartasi (soʻm)</span><input class="input num" id="s-card" inputmode="numeric" placeholder="0"></label>' +
-      '<label class="field"><span>Naqd dollar ($)</span><input class="input num" id="s-usd" inputmode="decimal" placeholder="0"></label>' +
-      '<label class="field"><span>Oyiga qancha sarflashni rejalaysiz (soʻm)</span><input class="input num" id="s-plan" inputmode="numeric" placeholder="Masalan: 12 000 000"></label>' +
+      '<label class="field"><span>Naqd soʻm</span><input class="input num money" id="s-cash" inputmode="numeric" placeholder="0"></label>' +
+      '<label class="field"><span>Bank kartasi (soʻm)</span><input class="input num money" id="s-card" inputmode="numeric" placeholder="0"></label>' +
+      '<label class="field"><span>Naqd dollar ($)</span><input class="input num money" id="s-usd" inputmode="decimal" placeholder="0"></label>' +
+      '<label class="field"><span>Oyiga qancha sarflashni rejalaysiz (soʻm)</span><input class="input num money" id="s-plan" inputmode="numeric" placeholder="Masalan: 12 000 000"></label>' +
       '<button class="btn block" data-act="setup">Boshlash</button></section>' +
       '<button class="btn ghost block" data-act="demo">Namuna maʼlumot bilan koʻrish</button>';
   }
@@ -269,7 +269,7 @@
       var mt = moveTarget(k);
       if (mt && !mt.same) {
         h += '<label class="field"><span>Qabul qilingan summa (' + (mt.ccy === 'USD' ? '$' : 'soʻm') + '), bozor kursida boʻlsa oʻzgartiring</span>' +
-          '<input class="input num" data-field="toAmount" inputmode="decimal" value="' + esc(k.toAmount) + '" placeholder="' +
+          '<input class="input num money" data-field="toAmount" inputmode="decimal" value="' + esc(k.toAmount) + '" placeholder="' +
           esc(mt.ccy === 'USD' ? String(mt.minor / 100).replace('.', ',') : E.fmtNum(mt.minor)) + '"></label>';
       }
     } else {
@@ -322,8 +322,8 @@
     var h = '<div class="add-head"><a class="pill" href="#qoshish">' + icon('back', 18) + ' Orqaga</a><b class="grow center">Matn bilan kiritish</b><span class="pill-gap"></span></div>';
     h += '<label class="field"><span>Bir qatorda bir nechta xarajat</span><textarea class="input" rows="2" data-field="text" placeholder="non 8 ming, sut 14 000, taksi 25k"></textarea></label>';
     h += '<div id="text-preview">' + textPreview() + '</div>';
-    h += sectionTitle('SMS yoki bildirishnomadan');
-    h += '<section class="card"><textarea class="input mono" rows="3" data-field="sms" placeholder="Bank SMS matnini shu yerga qoʻying"></textarea>' +
+    h += sectionTitle('SMS, bildirishnoma yoki chek');
+    h += '<section class="card"><textarea class="input mono" rows="3" data-field="sms" placeholder="Bank SMS yoki chek matnini shu yerga qoʻying"></textarea>' +
       '<button class="btn secondary block" data-act="pasteSms">Nusxadan qoʻyish</button><div id="sms-preview">' + smsPreview() + '</div></section>';
     return h;
   }
@@ -361,7 +361,9 @@
   }
 
   function smsResult() {
-    var r = E.parseSms(ui.sms, db.cats.filter(function (c) { return !c.hidden; }));
+    var list = db.cats.filter(function (c) { return !c.hidden; });
+    // a bank message names a card or balance; otherwise a receipt total wins
+    var s = E.parseSms(ui.sms, list), r = s && (s.card || s.balance != null) ? s : E.parseReceipt(ui.sms, list) || s;
     if (!r) return null;
     var byCard = r.card ? db.accounts.filter(function (a) { return a.card && String(a.card) === r.card; })[0] : null;
     r.acc = byCard || accById(ui.smsAcc) || accountFor(r.ccy, null);
@@ -369,9 +371,10 @@
     return r;
   }
   function smsPreview() {
-    if (!ui.sms.trim()) return '<p class="hint">Karta SMS yoki ilova bildirishnomasini nusxalab qoʻying: summa, doʻkon va karta oʻzi aniqlanadi.</p>';
+    if (!ui.sms.trim()) return '<p class="hint">Karta SMS yoki ilova bildirishnomasini nusxalab qoʻying: summa, doʻkon va karta oʻzi aniqlanadi.</p>' +
+      '<p class="hint"><b>Chek:</b> iPhone kamerasini chekka qarating, pastdagi matn belgisini bosing, “Hammasini tanlash” → “Nusxalash”, keyin shu yerga qoʻying. Jami summa va doʻkon oʻzi topiladi.</p>';
     var r = smsResult();
-    if (!r) return '<p class="hint warn">Summani topa olmadim. Matnda “UZS” yoki “soʻm” bilan summa boʻlishi kerak.</p>';
+    if (!r) return '<p class="hint warn">Summani topa olmadim. SMSda “UZS” yoki “soʻm” bilan summa, chekda “Jami” yoki “Итого” qatori boʻlishi kerak.</p>';
     var c = catById(r.cat), h = '<div class="row">' + catBadge(c) + '<span class="grow"><b>' + esc(r.name) + '</b><span class="sub">' + esc(c.name) +
       (r.acc ? ' · ' + esc(r.acc.name) : '') + (r.card ? ' (*' + r.card + ')' : '') + '</span></span><b class="num' + (r.kind === 'in' ? ' pos' : '') + '">' +
       money(r.kind === 'in' ? r.amount : -r.amount, r.ccy, { plus: true }).replace(' soʻm', '') + '</b></div>';
@@ -453,14 +456,14 @@
     var t = today(), month = E.monthOf(t), st = E.monthStats(db.tx, month), h = '';
     var left = E.daysInMonth(month) - +t.slice(8, 10) + 1;
     h += header(monthLabel(month) + ' · ' + left + ' kun qoldi', 'Rejalar');
-    h += '<section class="card"><label class="field"><span>Oylik xarajat rejasi (soʻm)</span><input class="input num" data-field="plan" inputmode="numeric" value="' +
+    h += '<section class="card"><label class="field"><span>Oylik xarajat rejasi (soʻm)</span><input class="input num money" data-field="plan" inputmode="numeric" value="' +
       (db.settings.plan ? E.fmtNum(db.settings.plan) : '') + '" placeholder="Masalan: 12 000 000"></label></section>';
 
     var withLim = cats('out').filter(function (c) { return db.limits[c.id]; });
     h += sectionTitle('Turkum limitlari', '<button class="link-btn" data-act="editLimits">' + (ui.editLimits ? 'Tayyor' : 'Oʻzgartirish') + '</button>');
     if (ui.editLimits) {
       h += '<section class="card list">' + cats('out').map(function (c) {
-        return '<label class="row">' + catBadge(c) + '<span class="grow">' + esc(c.name) + '</span><input class="input num lim" data-field="limit" data-v="' + c.id + '" inputmode="numeric" value="' +
+        return '<label class="row">' + catBadge(c) + '<span class="grow">' + esc(c.name) + '</span><input class="input num money lim" data-field="limit" data-v="' + c.id + '" inputmode="numeric" value="' +
           (db.limits[c.id] ? E.fmtNum(db.limits[c.id]) : '') + '" placeholder="—" aria-label="' + esc(c.name) + ' limiti"></label>';
       }).join('') + '</section>';
     } else if (withLim.length) {
@@ -478,12 +481,15 @@
     if (ui.form === 'rec') h += recForm();
     if (db.recurring.length) {
       h += '<section class="card list">' + db.recurring.slice().sort(function (a, b) { return E.nextDue(a.day, t, a.paid) < E.nextDue(b.day, t, b.paid) ? -1 : 1; }).map(function (r) {
+        if (ui.form === 'rec:' + r.id) return '<div class="pad">' + recForm(r) + '</div>';
         var due = E.nextDue(r.day, t, r.paid), days = E.daysBetween(t, due), paid = r.paid === month;
-        return '<div class="row"><span class="grow"><b>' + esc(r.name) + '</b><span class="sub ' + (paid ? 'pos' : days < 0 ? 'warn' : '') + '">' +
+        // swipe left reveals "delete"; a tap opens the edit form
+        return '<div class="swipe"><button class="swipe-del" data-act="delRec" data-v="' + r.id + '" tabindex="-1">' + icon('trash', 20) + '<span>Oʻchirish</span></button>' +
+          '<div class="row swipe-row" role="button" tabindex="0" data-act="form" data-v="rec:' + r.id + '"><span class="grow"><b>' + esc(r.name) + '</b><span class="sub ' + (paid ? 'pos' : days < 0 ? 'warn' : '') + '">' +
           (paid ? 'Bu oy toʻlandi · keyingisi ' + shortDate(due) : shortDate(due) + (days < 0 ? ' · muddati oʻtdi' : days === 0 ? '' : ' · ' + days + ' kundan keyin')) + '</span></span>' +
           '<b class="num">' + money(r.amount, r.ccy).replace(' soʻm', '') + '</b>' +
-          (paid ? '<button class="x-btn" data-act="delRec" data-v="' + r.id + '" aria-label="Oʻchirish">×</button>' : '<button class="btn sm secondary" data-act="payRec" data-v="' + r.id + '">Toʻlandi</button>') + '</div>';
-      }).join('') + '</section>';
+          (paid ? '<span class="paid-ic">' + icon('check', 20, 2.6) + '</span>' : '<button class="btn sm secondary" data-act="payRec" data-v="' + r.id + '">Toʻlandi</button>') + '</div></div>';
+      }).join('') + '</section><p class="hint">Oʻzgartirish uchun bosing, oʻchirish uchun chapga suring.</p>';
     } else if (ui.form !== 'rec') {
       h += '<section class="card empty"><p>Bogʻcha, kredit, internet, kommunal: muddatidan oldin eslatadi, bir bosishda yoziladi.</p></section>';
     }
@@ -509,36 +515,41 @@
       h += '<section class="card"><div class="between"><b class="b6">' + esc(g.name) + '</b><span class="num">' + money(g.saved, g.ccy) + ' / ' + money(g.target, g.ccy) + '</span></div>' +
         '<div class="bar"><div style="width:' + pct + '%;background:var(--accent)"></div></div>' +
         (ui.form === 'goalAdd:' + g.id
-          ? '<div class="row2"><input class="input num" id="g-add" inputmode="decimal" placeholder="Qancha qoʻshildi"><button class="btn sm" data-act="goalAdd" data-v="' + g.id + '">Qoʻshish</button></div>'
+          ? '<div class="row2"><input class="input num money" id="g-add" inputmode="decimal" placeholder="Qancha qoʻshildi"><button class="btn sm" data-act="goalAdd" data-v="' + g.id + '">Qoʻshish</button></div>'
           : '<div class="between"><span class="small mu">' + (g.saved >= g.target ? 'Maqsadga yetildi!' : money(g.target - g.saved, g.ccy) + ' qoldi') + '</span><span><button class="link-btn" data-act="form" data-v="goalAdd:' + g.id +
             '">+ Pul qoʻshish</button><button class="x-btn" data-act="delGoal" data-v="' + g.id + '" aria-label="Oʻchirish">×</button></span></div>') + '</section>';
     });
     return h;
   }
 
-  function accSelect(id, ccy) {
+  function sel(v, cur) { return '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>'; }
+  function accSelect(id, ccy, cur) {
     var list = ccy ? accsOf(ccy) : db.accounts;
-    return '<select class="input" id="' + id + '">' + list.map(function (a) { return '<option value="' + a.id + '">' + esc(a.name) + ' (' + (a.ccy === 'USD' ? '$' : 'soʻm') + ')</option>'; }).join('') + '</select>';
+    return '<select class="input" id="' + id + '">' + list.map(function (a) { return sel(a.id, cur) + esc(a.name) + ' (' + (a.ccy === 'USD' ? '$' : 'soʻm') + ')</option>'; }).join('') + '</select>';
   }
   function ccySelect(id) { return '<select class="input" id="' + id + '"><option value="UZS">soʻm</option><option value="USD">$</option></select>'; }
-  function catSelect(id, kind) { return '<select class="input" id="' + id + '">' + cats(kind).map(function (c) { return '<option value="' + c.id + '">' + esc(c.name) + '</option>'; }).join('') + '</select>'; }
+  function catSelect(id, kind, cur) { return '<select class="input" id="' + id + '">' + cats(kind).map(function (c) { return sel(c.id, cur) + esc(c.name) + '</option>'; }).join('') + '</select>'; }
+  // amount in minor units -> text for an input field
+  function amountText(minor, ccy) { return ccy === 'USD' ? E.fmtTyping(String(minor / 100).replace('.', ',')) : E.fmtNum(minor); }
 
-  function recForm() {
-    return '<section class="card form"><label class="field"><span>Nomi</span><input class="input" id="r-name" placeholder="Masalan: Bogʻcha"></label>' +
-      '<div class="grid2"><label class="field"><span>Summa</span><input class="input num" id="r-amount" inputmode="decimal"></label><label class="field"><span>Har oyning nechanchi kuni</span><input class="input num" id="r-day" inputmode="numeric" placeholder="1–31"></label></div>' +
-      '<div class="grid2"><label class="field"><span>Hisob</span>' + accSelect('r-acc') + '</label><label class="field"><span>Turkum</span>' + catSelect('r-cat', 'out') + '</label></div>' +
-      '<div class="grid2"><button class="btn secondary" data-act="form" data-v="">Bekor</button><button class="btn" data-act="saveRec">Saqlash</button></div></section>';
+  function recForm(r) {
+    return '<section class="card form' + (r ? ' flat' : '') + '"><label class="field"><span>Nomi</span><input class="input" id="r-name" value="' + esc(r ? r.name : '') + '" placeholder="Masalan: Bogʻcha"></label>' +
+      '<div class="grid2"><label class="field"><span>Summa</span><input class="input num money" id="r-amount" inputmode="decimal" value="' + (r ? amountText(r.amount, r.ccy) : '') + '" placeholder="0"></label>' +
+      '<label class="field"><span>Toʻlov kuni</span><input class="input num" id="r-day" inputmode="numeric" value="' + (r ? r.day : '') + '" placeholder="1–31"></label></div>' +
+      '<div class="grid2"><label class="field"><span>Hisob</span>' + accSelect('r-acc', null, r && r.acc) + '</label><label class="field"><span>Turkum</span>' + catSelect('r-cat', 'out', r && r.cat) + '</label></div>' +
+      '<div class="grid2"><button class="btn secondary" data-act="form" data-v="">Bekor</button><button class="btn" data-act="saveRec" data-v="' + (r ? r.id : '') + '">Saqlash</button></div>' +
+      (r ? '<button class="btn danger block" data-act="delRec" data-v="' + r.id + '">Oʻchirish</button>' : '') + '</section>';
   }
   function debtForm() {
     return '<section class="card form">' + seg([['gave', 'Men berdim'], ['took', 'Men oldim']], 'debtDir', ui.debtDir || 'gave') +
       '<label class="field"><span>Kim / qayer</span><input class="input" id="d-who" placeholder="Masalan: qoʻshni, doʻkon"></label>' +
-      '<div class="grid2"><label class="field"><span>Summa</span><input class="input num" id="d-amount" inputmode="decimal"></label><label class="field"><span>Valyuta</span>' + ccySelect('d-ccy') + '</label></div>' +
+      '<div class="grid2"><label class="field"><span>Summa</span><input class="input num money" id="d-amount" inputmode="decimal"></label><label class="field"><span>Valyuta</span>' + ccySelect('d-ccy') + '</label></div>' +
       '<label class="field"><span>Qaytarish muddati (ixtiyoriy)</span><input class="input" type="date" id="d-due"></label>' +
       '<div class="grid2"><button class="btn secondary" data-act="form" data-v="">Bekor</button><button class="btn" data-act="saveDebt">Saqlash</button></div></section>';
   }
   function goalForm() {
     return '<section class="card form"><label class="field"><span>Maqsad</span><input class="input" id="g-name" placeholder="Masalan: Yozgi taʼtil"></label>' +
-      '<div class="grid2"><label class="field"><span>Kerakli summa</span><input class="input num" id="g-target" inputmode="decimal"></label><label class="field"><span>Valyuta</span>' + ccySelect('g-ccy') + '</label></div>' +
+      '<div class="grid2"><label class="field"><span>Kerakli summa</span><input class="input num money" id="g-target" inputmode="decimal"></label><label class="field"><span>Valyuta</span>' + ccySelect('g-ccy') + '</label></div>' +
       '<div class="grid2"><button class="btn secondary" data-act="form" data-v="">Bekor</button><button class="btn" data-act="saveGoal">Saqlash</button></div></section>';
   }
 
@@ -569,7 +580,7 @@
       '<button class="link-btn" data-act="refreshRate">' + icon('refresh', 16) + (ui.rateBusy ? ' Yuklanmoqda…' : ' Yangilash') + '</button></div>' +
       '<div class="small mu">Markaziy bank' + (c ? ' · ' + dayLabel(c.date) : '') + '. Har bir yozuvga oʻsha kungi kurs yoziladi, eski hisoblar oʻzgarmaydi.</div>' +
       seg([['cbu', 'Markaziy bank'], ['market', 'Bozor kursi']], 'rateMode', db.settings.rateMode) +
-      (db.settings.rateMode === 'market' ? '<label class="field"><span>Bozor kursi (1 $ uchun soʻm)</span><input class="input num" data-field="market" inputmode="decimal" value="' +
+      (db.settings.rateMode === 'market' ? '<label class="field"><span>Bozor kursi (1 $ uchun soʻm)</span><input class="input num money" data-field="market" inputmode="decimal" value="' +
         (db.settings.market ? E.fmtNum(db.settings.market) : '') + '" placeholder="Masalan: 12 050"></label>' : '') + '</section>';
     return h;
   }
@@ -579,7 +590,7 @@
     var used = a && db.tx.some(function (t) { return t.acc === a.id || t.toAcc === a.id; });
     return '<div class="form pad"><label class="field"><span>Nomi</span><input class="input" id="a-name" value="' + esc(a ? a.name : '') + '" placeholder="Masalan: Humo karta"></label>' +
       (a ? '' : '<label class="field"><span>Valyuta</span>' + ccySelect('a-ccy') + '</label>') +
-      '<div class="grid2"><label class="field"><span>Boshlangʻich qoldiq</span><input class="input num" id="a-start" inputmode="decimal" value="' + esc(start) + '" placeholder="0"></label>' +
+      '<div class="grid2"><label class="field"><span>Boshlangʻich qoldiq</span><input class="input num money" id="a-start" inputmode="decimal" value="' + esc(start) + '" placeholder="0"></label>' +
       '<label class="field"><span>Karta oxirgi 4 raqami</span><input class="input num" id="a-card" inputmode="numeric" maxlength="4" value="' + esc(a && a.card || '') + '" placeholder="SMS uchun"></label></div>' +
       '<div class="grid2"><button class="btn secondary" data-act="form" data-v="">Bekor</button><button class="btn" data-act="saveAcc" data-v="' + (a ? a.id : '') + '">Saqlash</button></div>' +
       (a && !used ? '<button class="btn danger block" data-act="delAcc" data-v="' + a.id + '">Hisobni oʻchirish</button>' : '') + '</div>';
@@ -714,11 +725,13 @@
     editLimits: function () { ui.editLimits = !ui.editLimits; render(); },
     form: function (el) { ui.form = el.getAttribute('data-v') || null; render(); },
     debtDir: function (el) { ui.debtDir = el.getAttribute('data-v'); render(); },
-    saveRec: function () {
+    saveRec: function (el) {
       var g = function (id) { return document.getElementById(id).value; };
       var acc = accById(g('r-acc')), amount = num(g('r-amount')), day = Math.round(num(g('r-day')) || 0);
       if (!g('r-name').trim() || !(amount > 0) || day < 1 || day > 31 || !acc) { toast('Nomi, summa va kunni kiriting'); return; }
-      db.recurring.push({ id: uid(), name: g('r-name').trim(), amount: E.toMinor(amount, acc.ccy), ccy: acc.ccy, acc: acc.id, cat: g('r-cat'), day: day, paid: null });
+      var r = db.recurring.filter(function (x) { return x.id === el.getAttribute('data-v'); })[0];
+      if (!r) { r = { id: uid(), paid: null }; db.recurring.push(r); }
+      Object.assign(r, { name: g('r-name').trim(), amount: E.toMinor(amount, acc.ccy), ccy: acc.ccy, acc: acc.id, cat: g('r-cat'), day: day });
       ui.form = null; save(); render();
     },
     payRec: function (el) {
@@ -731,7 +744,17 @@
       toast(r.name + ' yozildi · ' + money(r.amount, r.ccy)); render();
       return id;
     },
-    delRec: function (el) { db.recurring = db.recurring.filter(function (x) { return x.id !== el.getAttribute('data-v'); }); save(); render(); },
+    delRec: function (el) {
+      var id = el.getAttribute('data-v'), r = db.recurring.filter(function (x) { return x.id === id; })[0];
+      if (!r) return;
+      ui.removedRec = r; db.recurring = db.recurring.filter(function (x) { return x !== r; });
+      ui.form = null; save(); render();
+      toast('“' + r.name + '” oʻchirildi', { act: 'restoreRec', v: id });
+    },
+    restoreRec: function () {
+      if (ui.removedRec) { db.recurring.push(ui.removedRec); ui.removedRec = null; save(); }
+      document.getElementById('toast').innerHTML = ''; render();
+    },
     saveDebt: function () {
       var g = function (id) { return document.getElementById(id).value; }, ccy = g('d-ccy'), amount = num(g('d-amount'));
       if (!g('d-who').trim() || !(amount > 0)) { toast('Kim va summani kiriting'); return; }
@@ -889,6 +912,7 @@
     var tf = document.querySelector('[data-field=text]'), sf = document.querySelector('[data-field=sms]');
     if (tf) tf.value = ui.text;
     if (sf) sf.value = ui.sms;
+    Array.prototype.forEach.call(document.querySelectorAll('input.money'), function (el) { if (el.value) el.value = E.fmtTyping(el.value); });
 
     var full = r.name === 'qoshish' || r.name === 'yozuv' || r.name === 'matn' || r.name === 'setup';
     var dock = document.getElementById('dock');
@@ -903,7 +927,57 @@
 
   // ---------- wiring ----------
 
+  // regroups a money field as it is typed and keeps the caret after the same digit
+  function groupField(el) {
+    var v = el.value, pos = el.selectionStart == null ? v.length : el.selectionStart, out = E.fmtTyping(v);
+    if (out === v) return;
+    var keep = v.slice(0, pos).replace(/[^\d.,−-]/g, '').length, i = 0, n = 0;
+    while (i < out.length && n < keep) { if (out[i] !== ' ') n++; i++; }
+    el.value = out;
+    try { el.setSelectionRange(i, i); } catch (e) { /* field type without a caret */ }
+  }
+
+  // swipe a row left to reveal its delete button
+  var drag = null, OPEN = -96;
+  document.addEventListener('touchstart', function (ev) {
+    var row = ev.target.closest('.swipe-row');
+    Array.prototype.forEach.call(document.querySelectorAll('.swipe-row[data-swiped]'), function (r) { r.removeAttribute('data-swiped'); });
+    Array.prototype.forEach.call(document.querySelectorAll('.swipe-row[data-open]'), function (r) {
+      if (r !== row) { r.style.transform = ''; r.removeAttribute('data-open'); }
+    });
+    if (!row) return;
+    var t = ev.touches[0];
+    drag = { row: row, x: t.clientX, y: t.clientY, base: row.hasAttribute('data-open') ? OPEN : 0, dx: 0, on: false };
+  }, { passive: true });
+  document.addEventListener('touchmove', function (ev) {
+    if (!drag) return;
+    var t = ev.touches[0], dx = t.clientX - drag.x, dy = t.clientY - drag.y;
+    if (!drag.on) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { drag = null; return; }
+      if (Math.abs(dx) < 10) return;
+      drag.on = true; drag.row.classList.add('dragging');
+    }
+    drag.dx = dx;
+    drag.row.style.transform = 'translateX(' + Math.max(OPEN - 24, Math.min(0, drag.base + dx)) + 'px)';
+  }, { passive: true });
+  document.addEventListener('touchend', function () {
+    if (!drag) return;
+    var d = drag; drag = null;
+    if (!d.on) return;
+    d.row.classList.remove('dragging');
+    var open = d.base + d.dx < OPEN / 2;
+    d.row.style.transform = open ? 'translateX(' + OPEN + 'px)' : '';
+    if (open) d.row.setAttribute('data-open', ''); else d.row.removeAttribute('data-open');
+    d.row.setAttribute('data-swiped', '');
+  });
+
   document.addEventListener('click', function (ev) {
+    // the click that ends a swipe, or a tap on an opened row, only closes it
+    var sw = ev.target.closest('.swipe-row');
+    if (sw && (sw.hasAttribute('data-swiped') || sw.hasAttribute('data-open'))) {
+      if (!sw.hasAttribute('data-swiped')) { sw.style.transform = ''; sw.removeAttribute('data-open'); }
+      sw.removeAttribute('data-swiped'); ev.preventDefault(); return;
+    }
     var el = ev.target.closest('[data-act]');
     if (!el || !ACTIONS[el.getAttribute('data-act')]) return;
     if (el.tagName !== 'A') ev.preventDefault();
@@ -911,6 +985,7 @@
   });
 
   document.addEventListener('input', function (ev) {
+    if (ev.target.classList && ev.target.classList.contains('money')) groupField(ev.target);
     var f = ev.target.getAttribute('data-field'), v = ev.target.value;
     if (!f) return;
     if (f === 'text') { ui.text = v; document.getElementById('text-preview').innerHTML = tr(textPreview()); return; }

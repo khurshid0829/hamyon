@@ -64,6 +64,32 @@ test('bank SMS: amount, merchant, card and balance', () => {
   assert.equal(E.parseSms('Salom, ertaga uchrashamiz', CATS), null);
 });
 
+test('money fields are grouped while typing', () => {
+  assert.equal(E.fmtTyping('500000'), '500 000');
+  assert.equal(E.fmtTyping('5000'), '5 000');
+  assert.equal(E.fmtTyping('50 0000'), '500 000');
+  assert.equal(E.fmtTyping('1250,505'), '1 250,50');
+  assert.equal(E.fmtTyping('12.5'), '12,5');
+  assert.equal(E.fmtTyping('007'), '7');
+  assert.equal(E.fmtTyping('-150000'), '-150 000');
+  assert.equal(E.fmtTyping(''), '');
+});
+
+test('receipt text: total and shop, VAT and paid-by lines ignored', () => {
+  const r = E.parseReceipt([
+    '"KORZINKA" MChJ', 'STIR: 301234567', 'Chek № 1842', 'Non 1 x 4 000,00   4 000,00', 'Sut 2 x 14 000,00   28 000,00',
+    'Jami: 186 500,00', 'shu jumladan QQS 12%: 19 982,14', 'Karta: 186 500,00'
+  ].join('\n'), CATS);
+  assert.equal(r.amount, 186500);
+  assert.equal(r.name, 'Korzinka');
+  assert.equal(r.cat, 'food');
+  // Russian receipt, total on the next line
+  const ru = E.parseReceipt('ООО "Makro"\nИНН 123456789\nИТОГО К ОПЛАТЕ\n94 300.00\nНДС 12% 10 103.57', CATS);
+  assert.equal(ru.amount, 94300);
+  assert.equal(ru.name, 'Makro');
+  assert.equal(E.parseReceipt('Salom\nertaga', CATS), null);
+});
+
 const TX = [
   { date: '2026-09-05', kind: 'out', amount: 300000, ccy: 'UZS', acc: 'a', cat: 'food', uzs: 300000, rate: 12000 },
   { date: '2026-09-20', kind: 'out', amount: 500000, ccy: 'UZS', acc: 'a', cat: 'food', uzs: 500000, rate: 12000 },

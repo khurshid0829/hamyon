@@ -1,5 +1,5 @@
 // Offline cache for the app shell. Bump VERSION when files change.
-var VERSION = 'hamyon-v1';
+var VERSION = 'hamyon-v2';
 var FILES = [
   './', 'index.html', 'styles.css', 'engine.js', 'data.js', 'app.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'
