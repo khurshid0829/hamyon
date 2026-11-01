@@ -4,7 +4,7 @@
 
   var E = window.Engine;
   var KEY = 'hamyon-v1';
-  var VERSION = '0.2';
+  var VERSION = '0.3';
   var FALLBACK_RATE = 12000;
   var CBU_URL = 'https://cbu.uz/uz/arkhiv-kursov-valyut/json/USD/';
   var TABS = [['asosiy', 'Asosiy', 'wallet'], ['tahlil', 'Tahlil', 'chart'], ['rejalar', 'Rejalar', 'target'], ['hisoblar', 'Hisoblar', 'list']];
@@ -184,6 +184,8 @@
       return '<a class="acc-chip" href="#hisoblar"><span>' + esc(a.name) + '</span><b class="num">' + money(bal[a.id], a.ccy).replace(' soʻm', '') + '</b></a>';
     }).join('') + '</div>';
 
+    var bk = Backup.reminder();
+    if (bk) h += '<a class="alert warn" href="#sozlamalar">' + icon('alert', 20) + '<span>' + bk + '</span></a>';
     alerts().slice(0, 2).forEach(function (x) {
       h += '<a class="alert ' + x.kind + '" href="' + x.href + '">' + icon('alert', 20) + '<span>' + x.text + '</span></a>';
     });
@@ -602,10 +604,11 @@
     var h = header('Sozlamalar', 'Hamyon', '<a class="icon-btn" href="#asosiy" aria-label="Orqaga">' + icon('back', 20) + '</a>');
     h += sectionTitle('Yozuv') + '<section class="card">' + seg([['lat', 'Lotin'], ['new', 'Lotin 2026'], ['cyr', 'Кирилл']], 'script', db.settings.script, 'seg3') +
       '<p class="small mu">“Lotin 2026” — 2026-yil 21-oktabrdagi qonun boʻyicha yangi alifbo (Ö, Ğ, Ş, Ç), 2027-yil 22-apreldan kuchga kiradi. Maʼlumotlar oʻzgarmaydi, faqat ekrandagi yozuv almashadi.</p></section>';
+    h += sectionTitle('Zaxira') + Backup.html();
     h += sectionTitle('Maʼlumotlar') + '<section class="card">' +
       '<button class="btn secondary block" data-act="export">Nusxa olish (JSON fayl)</button>' +
       '<label class="btn secondary block">Nusxadan tiklash<input type="file" accept="application/json,.json" data-change="import" hidden></label>' +
-      '<p class="small mu">Maʼlumotlar faqat shu telefonda. Oyiga bir marta nusxa olib, iCloud yoki Telegram “Saqlangan”ga qoʻyib qoʻying.</p>' +
+      '<p class="small mu">Maʼlumotlar shu telefonda saqlanadi. Telegram zaxirasi ulanmagan boʻlsa, oyiga bir marta nusxa olib qoʻying.</p>' +
       '<button class="btn danger block" data-act="clearAll">Hamma maʼlumotni oʻchirish</button></section>';
     h += '<p class="tiny mu center">Hamyon ' + VERSION + ' · ' + db.tx.length + ' ta yozuv · kurs: cbu.uz</p>';
     return h;
@@ -791,6 +794,7 @@
     rateMode: function (el) { db.settings.rateMode = el.getAttribute('data-v'); save(); render(); },
     script: function (el) { db.settings.script = el.getAttribute('data-v'); save(); render(); },
     export: function () {
+      Backup.noteManual();
       var name = 'hamyon-' + today() + '.json', file = new File([JSON.stringify(db, null, 2)], name, { type: 'application/json' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: name }).catch(function () { /* closed */ }); return; }
       var a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click();
@@ -805,11 +809,11 @@
   function importFile(input) {
     var f = input.files && input.files[0];
     if (!f) return;
-    f.text().then(function (text) {
+    f.text().then(Backup.open).then(function (text) {
       var data = normalize(JSON.parse(text));
       if (!confirm(data.tx.length + ' ta yozuv topildi. Joriy maʼlumotlar almashtirilsinmi?')) return;
       db = data; save(); toast('Tiklandi'); go('#asosiy');
-    }).catch(function () { toast('Fayl oʻqilmadi'); });
+    }).catch(function (e) { toast(e.userMsg || 'Fayl oʻqilmadi'); });
   }
 
   // ---------- exchange rate ----------
@@ -1009,6 +1013,8 @@
   });
 
   window.addEventListener('hashchange', render);
+
+  Backup.setup({ name: 'hamyon', title: 'Hamyon', getData: function () { return db; }, hasData: function () { return db.accounts.length > 0; }, toast: toast, tr: tr });
 
   render();
   // refresh the official rate once a day when online

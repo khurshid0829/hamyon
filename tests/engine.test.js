@@ -160,6 +160,7 @@ test('Cyrillic transliteration', () => {
 });
 
 test('HTML transliteration leaves tags, entities and values', () => {
+  assert.equal(E.translitHtml('Bot <code>@BotFather</code> oching', E.toCyrillic), 'Бот <code>@BotFather</code> очинг');
   const h = '<a href="#tahlil" data-v="oziq" aria-label="Tahlil">Soʻm &amp; dollar</a><input placeholder="Izoh" value="non">';
   assert.equal(E.translitHtml(h, E.toCyrillic),
     '<a href="#tahlil" data-v="oziq" aria-label="Таҳлил">Сўм &amp; доллар</a><input placeholder="Изоҳ" value="non">');

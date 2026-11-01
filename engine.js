@@ -314,11 +314,14 @@
 
   // converts visible text of an HTML string; tags, entities and attribute values stay (except a few visible ones)
   function translitHtml(html, fn) {
+    var literal = false; // <code> holds names that must not change, like a bot name
     return String(html).split(/(<[^>]*>)/).map(function (part) {
       if (part.charAt(0) === '<') {
+        if (/^<code\b/.test(part)) literal = true;
+        if (/^<\/code/.test(part)) literal = false;
         return part.replace(/(placeholder|aria-label|title)="([^"]*)"/g, function (m, a, v) { return a + '="' + textOnly(v, fn) + '"'; });
       }
-      return textOnly(part, fn);
+      return literal ? part : textOnly(part, fn);
     }).join('');
   }
   function textOnly(s, fn) {
